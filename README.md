@@ -3,7 +3,7 @@
 ## Data
 The raw data should be downloaded from the following links and placed in the `_raw` folder before running the pipeline:
 - Single-cell RNA-seq: Breast cancer dataset https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE118389
-- ChIP-seq: From our study on Phf21b https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE106999
+- ChIP-seq: From a study on Phf21b https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE106999
 
 For the ChIP-seq analysis, the following samples were used:
 - [GSM2859278 - Phf21b_ChIP_mESC_pDox_Replicate1](https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSM2859278)

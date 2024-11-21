@@ -15,3 +15,7 @@ output:
     toc_depth: 4
     number_sections: true
 ---
+
+```{r paths, message=FALSE, warning=FALSE}
+
+```

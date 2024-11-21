@@ -1,2 +1,6 @@
 data/
 temp/
+.Rproj.user
+.Rhistory
+.RData
+.Ruserdata
