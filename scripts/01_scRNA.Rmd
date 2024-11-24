@@ -17,5 +17,37 @@ output:
 ---
 
 ```{r paths, message=FALSE, warning=FALSE}
+# Read data
+tpm.rsem <- read.table(here::here("data", "GSE118389_tpm_rsem.txt"), sep = "\t")
+counts.rsem <- read.table(here::here("data", "GSE118389_counts_rsem.txt"), sep = "\t")
+norm.data <- read.table(here::here("data", "GSE118389_norm_data.txt"), sep = "\t")
+
+# Took these 2 from paper github: https://github.com/Michorlab/tnbc_scrnaseq
+qc <- read.table(here::here("data", "qc_original.txt"), sep = "\t", stringsAsFactors = FALSE) # quality control
+mappings <- readRDS(here::here("data", "mappings.RDS")) # genes info
+
+# I noticed a mismatch in the data. 2 cells are missing in the tpm.rsem object compared to qc. Filter those missing.
+common_names <- intersect(rownames(qc), colnames(tpm.rsem))
+qc_filtered <- qc[common_names, ]
+
+# Do quality control
+min_thresh_log_tpm <- 0.1 # TPM must be higher than 1.07
+sceset_all <- SingleCellExperiment(assays = list(counts = as.matrix(counts.rsem), 
+                                           tpm = as.matrix(tpm.rsem),
+                                           exprs = log2(as.matrix(tpm.rsem) + 1), 
+                                           expressed = log2(tpm.rsem + 1) > min_thresh_log_tpm),
+                                           colData = qc_filtered, 
+                                           rowData = mappings)
+## QC per cell
+sceset_all <- scater::addPerCellQC(
+  sceset_all,
+  exprs_values = "exprs",
+  detection_limit = min_thresh_log_tpm
+)
+
+## Remove NAs
+if (length(which(is.na(as.numeric(sceset_all$uniquely_mapped_percent)))) > 0)
+  sceset_all <- sceset_all[, -which(is.na(as.numeric(sceset_all$uniquely_mapped_percent)))]
+
 
 ```
