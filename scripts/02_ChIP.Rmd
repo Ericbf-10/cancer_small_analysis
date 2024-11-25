@@ -15,3 +15,165 @@ output:
     toc_depth: 4
     number_sections: true
 ---
+
+# Read and understand data
+
+I've been provided WIG files from a ChIP-Seq experiments, so the data is already preprocessed, representing the signal intensities across the genome. This indicates the enrichment of a protein of interest at specific genomic regions, in this case Phf21b.
+
+```{r read, message=FALSE, warning=FALSE}
+# Load packages and paths
+library(here)
+source(here::here("scripts", "install.R"))
+source(here::here("scripts", "paths.R"))
+
+# Read data
+rep1_mesc_data <- import(here::here("data", "GSM2859278_Phf21b_ChIP_mESC_pDox_Replicate1.wig"), format = "wig")
+rep2_mesc_data <- import(here::here("data", "GSM2859279_Phf21b_ChIP_mESC_pDox_Replicate2.wig"), format = "wig")
+rep1_n2a_data <- import(here::here("data", "GSM2859280_Phf21b_ChIP_N2A_Day2_Diff_Replicate1.wig"), format = "wig")
+input_n2a_data <- import(here::here("data", "GSM2859281_Phf21b_Input_N2A_Day2_Diff_Replicate1.wig"), format = "wig")
+
+# Create path for results
+chipseq_results_path <- file.path(results_path,
+                          "./chipseq")
+if (!dir.exists(chipseq_results_path)) {
+  dir.create(chipseq_results_path, recursive = TRUE)
+}
+```
+
+There are 4 samples:
+
+- Sample 1: Murine Neuro2a (N2a) cells. These are a widely used mouse neuroblastoma cell line derived from the spontaneous tumor of a strain A albino mouse.
+
+- Sample 2: Replicate of sample 1.
+
+- Sample 3: Murine Embryonic Stem cells. These are transgenic A2lox ES cells harboring the murine Phf21b fused to an N-terminal HA tag under the control of a doxycycline-inducible promoter.
+
+- Sample 4: control sample (input) of the ChIP-Seq. This is used to distinguish true protein-DNA binding events from background noise.
+
+The data is already preprocessed using FastQC, bowtie for alignment with reference genome and indexed using SAMtools. Then WIG files were generated using QuasR.
+
+# Plots
+
+## Signal intensity on Genomic position of Phf21b
+
+```{r plot1, message=FALSE, warning=FALSE}
+samples <- list(
+  "Phf21b_ChIP_mESC_pDox_Replicate1" = rep1_mesc_data,
+  "Phf21b_ChIP_mESC_pDox_Replicate2" = rep2_mesc_data,
+  "Phf21b_ChIP_N2A_Day2_Diff_Replicate1" = rep1_n2a_data,
+  "Phf21b_Input_N2A_Day2_Diff_Replicate1" = input_n2a_data
+)
+
+# Plot 1
+for (sample_name in names(samples)) {
+  sample_data <- samples[[sample_name]]
+  sample_df <- as.data.frame(sample_data)
+  
+  plot <- ggplot(sample_df, aes(x = start, y = score)) +
+    geom_line() +
+    theme_bw() +
+    labs(title = paste("ChIP-Seq Signal -", sample_name),
+         x = "Genomic Position",
+         y = "Signal Intensity")
+  
+  # Save plot to results path
+  ggsave(
+    filename = file.path(chipseq_results_path, paste0(sample_name, "_signal_plot.png")),
+    plot = plot,
+    width = 10,
+    height = 6
+  )
+}
+
+# Display the PNG images
+knitr::include_graphics(file.path(chipseq_results_path, "Phf21b_ChIP_mESC_pDox_Replicate1_signal_plot.png"))
+knitr::include_graphics(file.path(chipseq_results_path, "Phf21b_ChIP_mESC_pDox_Replicate2_signal_plot.png"))
+knitr::include_graphics(file.path(chipseq_results_path, "Phf21b_ChIP_N2A_Day2_Diff_Replicate1_signal_plot.png"))
+knitr::include_graphics(file.path(chipseq_results_path, "Phf21b_Input_N2A_Day2_Diff_Replicate1_signal_plot.png"))
+```
+
+The above plots indicate that Phf21b is highly enriched around position 100,000,000 of the genome, and less prominently around position 35,000,000.
+
+## Genome Browser plots
+
+I looked at the genomic positions of 4 cell cycle genes that cobound with Phf21b using the same mouse reference genome as in the paper ([mm9](https://genome-euro.ucsc.edu/cgi-bin/hgGateway?hgsid=346811084_67jGhvPsvKZEfT7s4Yho4M5mp0RQ)). Here is the list of genes analyzed:
+
+1. Cdt1 - chr8:125091915-125097030
+2. E2f1 - chr2:154385375-154395588
+3. E2f7 - chr10:110182521-110224440
+4. Mcm5 - chr8:77633427-77652338
+
+```{r plot2, message=FALSE, warning=FALSE}
+# # Copy data
+# rep1_mesc_copy <- copy(rep1_mesc_data)
+# rep2_mesc_copy <- copy(rep2_mesc_data)
+# rep1_n2a_copy <- copy(rep1_n2a_data)
+# input_n2a_copy <- copy(input_n2a_data)
+
+generate_chipseq_plot <- function(gene_name, chr_num, start_pos, end_pos, output_path) {
+  
+  # Target region
+  target_region <- GRanges(seqnames = chr_num, ranges = IRanges(start = start_pos, end = end_pos))
+  
+  # Data tracks for each replicate and input
+  track_rep1_mesc <- DataTrack(range = rep1_mesc_data,
+                               genome = "mm9", 
+                               chromosome = chr_num,
+                               name = "Rep1 (mESC)", 
+                               type = "l", 
+                               col = "blue",
+                               ylim = c(0, 100))
+  
+  track_rep2_mesc <- DataTrack(range = rep2_mesc_data, 
+                               genome = "mm9", 
+                               chromosome = chr_num,
+                               name = "Rep2 (mESC)", 
+                               type = "l", 
+                               col = "red",
+                               ylim = c(0, 100))
+  
+  track_rep1_n2a <- DataTrack(range = rep1_n2a_data, 
+                              genome = "mm9", 
+                              chromosome = chr_num,
+                              name = "Rep1 (N2A)", 
+                              type = "l", 
+                              col = "green",
+                              ylim = c(0, 100))
+  
+  track_input_n2a <- DataTrack(range = input_n2a_data, 
+                               genome = "mm9", 
+                               chromosome = chr_num,
+                               name = "Input (N2A)", 
+                               type = "l", 
+                               col = "gray",
+                               ylim = c(0, 100))
+  
+  # Gene track
+  axisTrack <- GenomeAxisTrack()
+  gene_track <- GeneRegionTrack(TxDb.Mmusculus.UCSC.mm9.knownGene, 
+                                genome = "mm9", 
+                                chromosome = chr_num, 
+                                name = "Genes")
+  
+  # Plot
+  plotTracks(list(axisTrack, track_rep1_mesc, track_rep2_mesc, track_rep1_n2a, track_input_n2a, gene_track),
+             from = start_pos - 2000, to = end_pos + 2000,
+             chromosome = chr_num, genome = "mm9",
+             main = paste0("Phf21b Enrichment at Target Promoter: ", gene_name))
+  
+  # Save plot to PDF
+  pdf(file.path(output_path, paste0("Phf21b_Enrichment_at_Target_Promoter_", gene_name, ".pdf")), width = 10, height = 6)
+  plotTracks(list(axisTrack, track_rep1_mesc, track_rep2_mesc, track_rep1_n2a, track_input_n2a, gene_track),
+             from = start_pos - 2000, to = end_pos + 2000,
+             chromosome = chr_num, genome = "mm9",
+             main = paste0("Phf21b Enrichment at Target Promoter: ", gene_name))
+  dev.off()
+}
+
+generate_chipseq_plot("Cdt1", "chr8", 125091915, 125097030, chipseq_results_path)
+generate_chipseq_plot("E2f1", "chr2", 154385375, 154395588, chipseq_results_path)
+generate_chipseq_plot("E2f7", "chr10", 110182521, 110224440, chipseq_results_path)
+generate_chipseq_plot("Mcm5", "chr8", 77633427, 77652338, chipseq_results_path)
+```
+
+As described in the paper, a key finding is that Phf21b acts as an inhibitor of cell cycle progression of neural cells in mice. The above plots confirm the presence of Phf21b at 4 key genes involved in cell cycle.

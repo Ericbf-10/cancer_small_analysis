@@ -1,6 +1,6 @@
 ---
 title: "Small analysis for Tiwari V. et al."
-subtitle: <center> Install packages, Define paths and Data preprocessing </center>
+subtitle: <center> Data preprocessing </center>
 author: "Eric Bautista Farrerons"
 date: '`r paste("First created on November 2024. Updated on ", format(Sys.Date(), "%d %B %Y"))`'
 output:
@@ -16,62 +16,11 @@ output:
     number_sections: true
 ---
 
-```{r paths, message=FALSE, warning=FALSE}
-## Install the required packages for the whole pipeline
-
-# Check and install packages if not already installed
-install_if_missing <- function(package) {
-  if (!requireNamespace(package, quietly = TRUE)) {
-    install.packages(package)
-  }
-}
-
-# List of packages to check and install
-packages <- c("here", "R.utils", "dplyr", "plyr", "dplyr", "ggplot2", "broman", "circlize", "reshape2", "gplots", "Rtsne", "png")
-
-# Iterate over the list and install missing packages
-lapply(packages, install_if_missing)
-
-# Specific check for BiocManager and Bioconductor packages
-install_if_missing_biocmanager <- function(package) {
-  if (!requireNamespace(package, quietly = TRUE)) {
-    BiocManager::install(package)
-  }
-}
-
-if (!requireNamespace("BiocManager", quietly = TRUE)) {
-  install.packages("BiocManager")
-}
-
-# List of Bioconductor packages
-bioconductor_packages <- c("biomaRt", "SingleCellExperiment", "scater", "scran", "RUVSeq", "monocle", "ComplexHeatmap")
-
-# Iterate over the list and install missing Bioconductor packages
-lapply(bioconductor_packages, install_if_missing_biocmanager)
-
-# Load all packages
-all_packages <- c(packages, bioconductor_packages)
-
-lapply(all_packages, function(pkg) {
-  library(pkg, character.only = TRUE)
-})
-```
-
-```{r paths, message=FALSE, warning=FALSE}
-### DEFINE PATHS ###
-
-# Find the current directory
-root_path <- here::here()
-
-# Define the current directory as the root directory
-data_path <- file.path(root_path,
-                       "./data")
-raw_path <- file.path(data_path,
-                       "./_raw")
-scripts_path <- file.path(root_path,
-                          "./scripts")
-results_path <- file.path(root_path,
-                       "./results")
+```{r gunzip, message=FALSE, warning=FALSE}
+# Load packages and paths
+library(here)
+source(here::here("scripts", "install.R"))
+source(here::here("scripts", "paths.R"))
 
 # Gunzip all files in the raw data folder and place them in the data folder
 gunzip_files <- function(raw_path, data_path) {

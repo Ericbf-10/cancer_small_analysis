@@ -16,38 +16,29 @@ output:
     number_sections: true
 ---
 
-```{r paths, message=FALSE, warning=FALSE}
+```{r read, message=FALSE, warning=FALSE}
+# Load packages and paths
+library(here)
+source(here::here("scripts", "install.R"))
+source(here::here("scripts", "paths.R"))
+
 # Read data
 tpm.rsem <- read.table(here::here("data", "GSE118389_tpm_rsem.txt"), sep = "\t")
 counts.rsem <- read.table(here::here("data", "GSE118389_counts_rsem.txt"), sep = "\t")
 norm.data <- read.table(here::here("data", "GSE118389_norm_data.txt"), sep = "\t")
 
-# Took these 2 from paper github: https://github.com/Michorlab/tnbc_scrnaseq
-qc <- read.table(here::here("data", "qc_original.txt"), sep = "\t", stringsAsFactors = FALSE) # quality control
-mappings <- readRDS(here::here("data", "mappings.RDS")) # genes info
+# Create path for results
+scrnaseq_results_path <- file.path(results_path,
+                          "./scrnaseq")
+if (!dir.exists(scrnaseq_results_path)) {
+  dir.create(scrnaseq_results_path, recursive = TRUE)
+}
+```
 
-# I noticed a mismatch in the data. 2 cells are missing in the tpm.rsem object compared to qc. Filter those missing.
-common_names <- intersect(rownames(qc), colnames(tpm.rsem))
-qc_filtered <- qc[common_names, ]
+By reading the paper ([Ellisen LW et al.](https://pmc.ncbi.nlm.nih.gov/articles/PMC6123496/)
+) I found that the data was already pre-processed and quality checked in `GSE118389_norm_data.txt`. There are 1189 cells left from an initial amount of 1534.
 
-# Do quality control
-min_thresh_log_tpm <- 0.1 # TPM must be higher than 1.07
-sceset_all <- SingleCellExperiment(assays = list(counts = as.matrix(counts.rsem), 
-                                           tpm = as.matrix(tpm.rsem),
-                                           exprs = log2(as.matrix(tpm.rsem) + 1), 
-                                           expressed = log2(tpm.rsem + 1) > min_thresh_log_tpm),
-                                           colData = qc_filtered, 
-                                           rowData = mappings)
-## QC per cell
-sceset_all <- scater::addPerCellQC(
-  sceset_all,
-  exprs_values = "exprs",
-  detection_limit = min_thresh_log_tpm
-)
-
-## Remove NAs
-if (length(which(is.na(as.numeric(sceset_all$uniquely_mapped_percent)))) > 0)
-  sceset_all <- sceset_all[, -which(is.na(as.numeric(sceset_all$uniquely_mapped_percent)))]
-
+```{r barplot, message=FALSE, warning=FALSE}
+# Bar plot of cell types
 
 ```
