@@ -23,8 +23,9 @@ I've been provided WIG files from a ChIP-Seq experiments, so the data is already
 ```{r read, message=FALSE, warning=FALSE}
 # Load packages and paths
 library(here)
-source(here::here("scripts", "install.R"))
+source(here::here("scripts", "functions.R"))
 source(here::here("scripts", "paths.R"))
+source(here::here("scripts", "install.R"))
 
 # Read data
 rep1_mesc_data <- import(here::here("data", "GSM2859278_Phf21b_ChIP_mESC_pDox_Replicate1.wig"), format = "wig")
@@ -42,11 +43,11 @@ if (!dir.exists(chipseq_results_path)) {
 
 There are 4 samples:
 
-- Sample 1: Murine Neuro2a (N2a) cells. These are a widely used mouse neuroblastoma cell line derived from the spontaneous tumor of a strain A albino mouse.
+- Sample 1: Murine Embryonic Stem cells. These are transgenic A2lox ES cells harboring the murine Phf21b fused to an N-terminal HA tag under the control of a doxycycline-inducible promoter.
 
 - Sample 2: Replicate of sample 1.
 
-- Sample 3: Murine Embryonic Stem cells. These are transgenic A2lox ES cells harboring the murine Phf21b fused to an N-terminal HA tag under the control of a doxycycline-inducible promoter.
+- Sample 3: Murine Neuro2a (N2a) cells. These are a widely used mouse neuroblastoma cell line derived from the spontaneous tumor of a strain A albino mouse.
 
 - Sample 4: control sample (input) of the ChIP-Seq. This is used to distinguish true protein-DNA binding events from background noise.
 

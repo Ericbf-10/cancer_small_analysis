@@ -16,11 +16,14 @@ output:
     number_sections: true
 ---
 
+# Load and understand data
+
 ```{r read, message=FALSE, warning=FALSE}
 # Load packages and paths
 library(here)
-source(here::here("scripts", "install.R"))
+source(here::here("scripts", "functions.R"))
 source(here::here("scripts", "paths.R"))
+source(here::here("scripts", "install.R"))
 
 # Read data
 tpm.rsem <- read.table(here::here("data", "GSE118389_tpm_rsem.txt"), sep = "\t")
@@ -36,9 +39,178 @@ if (!dir.exists(scrnaseq_results_path)) {
 ```
 
 By reading the paper ([Ellisen LW et al.](https://pmc.ncbi.nlm.nih.gov/articles/PMC6123496/)
-) I found that the data was already pre-processed and quality checked in `GSE118389_norm_data.txt`. There are 1189 cells left from an initial amount of 1534.
+) I found that the data was already pre-processed and quality checked in `GSE118389_norm_data.txt`. There are 1189 cells left from an initial amount of 1534. So this is the data that I am going to use for the analysis.
 
-```{r barplot, message=FALSE, warning=FALSE}
+# Filtering
+
+Here I want to filter genes that are expressed in a few cells and those that have a low variance.
+
+```{r filter, message=FALSE, warning=FALSE}
+variance <- rowVars(as.matrix(norm.data))
+norm.data2 <- norm.data[variance > quantile(variance, 0.25), ]
+```
+
+# Cell type classification
+
+Here I classify the cells by type using the marker genes from the paper (`markers_clean.txt`), although the method is different.
+
+```{r classif, message=FALSE, warning=FALSE}
+# Load marker genes
+all_markers <- read.table(here::here("data", "markers_clean.txt"), sep = "\t", header = TRUE, stringsAsFactors = FALSE)
+
+# Add hgnc_symbol column and filter markers
+norm.data2$hgnc_symbol <- rownames(norm.data2)
+norm.data2 <- norm.data2[, c("hgnc_symbol", setdiff(names(norm.data2), "hgnc_symbol"))]
+markers <- unique(all_markers[all_markers$gene %in% norm.data2$hgnc_symbol, ])
+markers <- markers[, !names(markers) %in% "note"] # rm empty column
+norm.data2 <- norm.data2[, !colnames(norm.data2) %in% "hgnc_symbol"] # rm hgnc_symbol column
+
+# Adjust labels for plotting
+markers$type_short <- markers$type
+markers$type_short[which(markers$type == "luminalprogenitor")] <- "luminal progenitor"
+markers$type_short[which(markers$type == "luminalepithelial")] <- "luminal epithelial"
+markers$type_short[which(markers$type == "basalepithelial")] <- "basal epithelial"
+markers$type_short[which(markers$type %in% c("EPCAM", "EGFR", "CDH1"))] <- "epithelial"
+markers$type_short[which(markers$type == "Bcell")] <- "B cell"
+markers$type_short[which(markers$type == "Tcell")] <- "T cell"
+markers$type_short[which(markers$type == "stroma")] <- "stroma"
+markers$type_short[which(markers$type == "endothelial")] <- "endothelial"
+
+# Classify
+thresh <- 1 # Same threshold as paper
+cells_markers <- lists_markers(norm.data2, thresh, markers)
+
+## Epithelial
+epithelial_markers <- cells_markers$epithelial_cells
+is_epithelial <- decide_is_epithelial(epithelial_markers)
+
+## Immune
+immune_markers <- cells_markers$immune_cells
+is_immune <- decide_is_immune(immune_markers)
+
+## Other
+other_markers <- cells_markers$other_cells
+is_other <- decide_is_other(other_markers)
+
+## Epithelial with only 1 marker gene
+# Using  empirical cumulative distribution function within same patient
+one_epithelial_marker <- expression_one_epithelial_marker(norm.data2, is_epithelial, epithelial_markers, "pats", 0.5)
+is_epithelial[which(one_epithelial_marker$is_epithelial_extra == 1)] <- 1
+
+## Simplify type labels
+is_epithelial_simple <- is_epithelial
+is_epithelial_simple[which(is_epithelial == 1)] <- "epithelial"
+is_immune_simple <- is_immune
+is_immune_simple[which(is_immune == "immune_mix")] <- 0
+is_other_simple <- is_other
+is_other_simple[which(is_other == "other_mix")] <- 0
+
+## Group cell types
+cells_types <- paste(is_epithelial_simple, is_immune_simple, is_other_simple, sep = "_")
+names(cells_types) <- names(is_epithelial)
+cell_types <- sapply(strsplit(cells_types, "_"), function(x){
+  # if none of the cell types (epithelial, immune, other), return unknown
+  if (sum(x == 0) == 3) return("unknown") else 
+    # if only one cell type was assigned, return that
+    if (sum(x == 0) == 2) return(setdiff(x, "0")) else
+      # if endothelial and stroma, return endothelial
+      if (sum(c("epithelial", "stroma", "0") %in% x) == 3) return("epithelial") else
+        # Ambiguous cases
+        return(paste(setdiff(x, "0"),collapse = "_"))})
+cell_types_simple <- cell_types
+cell_types_simple[which(sapply(strsplit(cell_types, "_"), length) > 1)] <- "unknown"
+table(cell_types_simple)
+
+## Further refinement is done in the original paper, but I decided to stop here
+```
+
 # Bar plot of cell types
 
+```{r barplot, message=FALSE, warning=FALSE}
+# Extract Patient IDs
+patient_ids <- sub("_.*$", "", names(cell_types_simple))
+
+# Create a data frame
+data <- data.frame(
+  patient_id = patient_ids,
+  cell_type = cell_types_simple
+)
+
+# Calculate proportions for each cell type within each patient
+data_summary <- data %>%
+  group_by(patient_id, cell_type) %>%
+  dplyr::summarise(Count = n(), .groups = "drop") %>%
+  group_by(patient_id) %>%
+  dplyr::mutate(Proportion = Count / sum(Count))
+
+# Create a stacked bar plot
+plot <- ggplot(data_summary, aes(x = patient_id, y = Proportion, fill = cell_type)) +
+  geom_bar(stat = "identity", position = "stack") +
+  scale_y_continuous(labels = scales::percent_format()) +
+  labs(
+    title = "Distribution of cell type for each patient",
+    x = "Patient ID",
+    y = "Percentage of cells",
+    fill = "Cell type"
+  ) +
+  theme_bw()
+
+# Save the plot
+ggsave(
+    filename = file.path(scrnaseq_results_path, "barplot_cell_types_patients.png"),
+    plot = plot,
+    width = 6,
+    height = 8
+  )
+
+# Display the PNG image
+knitr::include_graphics(file.path(scrnaseq_results_path, "barplot_cell_types_patients.png"))
 ```
+
+The results are a bit different from the paper because I didn't do the refinement of cell type classification, so I have more cells classified as epithelial and less in other types. However, the results are similar.
+
+# Dimensionality reduction
+
+Here I want to do dimensionality reduction by using t-SNE. I chose t-SNE over UMAP because the dataset is rather small and I am interested in seeing discrete cell populations clearly separated in clusters. I used a perplexity of 30.
+
+```{r tsne, message=FALSE, warning=FALSE}
+# Add small noise because 2 genes have the same values
+norm.data2_noisy <- norm.data2 + matrix(rnorm(length(norm.data2), mean = 0, sd = 1e-6), nrow = nrow(norm.data2))
+
+# Run t-SNE
+tsne_results <- Rtsne(t(norm.data2_noisy), perplexity = 30)
+tsne_df <- as.data.frame(tsne_results$Y)
+colnames(tsne_df) <- c("tSNE1", "tSNE2")
+tsne_df$cell_type <- data$cell_type
+tsne_df$patient_id <- data$patient_id
+
+# Plot
+plot2 <- ggplot(tsne_df, aes(x = tSNE1, y = tSNE2, color = cell_type, shape = patient_id)) +
+  geom_point(size = 3) +
+  labs(
+    title = "t-SNE Plot of Cell Types by Patient",
+    x = "Component 1",
+    y = "Component 2",
+    color = "Cell type",
+    shape = "Patient"
+  ) +
+  theme_bw() +
+  theme(
+    plot.title = element_text(hjust = 0.5, face = "bold", size = 16),
+    legend.title = element_text(size = 12),
+    legend.text = element_text(size = 10)
+  )
+
+# Save the plot
+ggsave(
+    filename = file.path(scrnaseq_results_path, "tsne_cell_types_patients.png"),
+    plot = plot2,
+    width = 10,
+    height = 10
+  )
+
+# Display the PNG image
+knitr::include_graphics(file.path(scrnaseq_results_path, "tsne_cell_types_patients.png"))
+```
+
+Results are similar to the paper, where we can see that the different non-epithelial cell types form defined clusters, and the epithelial cells formed different subgroups.

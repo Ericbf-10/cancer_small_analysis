@@ -19,35 +19,9 @@ output:
 ```{r gunzip, message=FALSE, warning=FALSE}
 # Load packages and paths
 library(here)
-source(here::here("scripts", "install.R"))
+source(here::here("scripts", "functions.R"))
 source(here::here("scripts", "paths.R"))
-
-# Gunzip all files in the raw data folder and place them in the data folder
-gunzip_files <- function(raw_path, data_path) {
-  if (!dir.exists(raw_path)) {
-    stop("Raw path does not exist: ", raw_path)
-  }
-  if (!dir.exists(data_path)) {
-    dir.create(data_path, recursive = TRUE)
-  }
-  
-  # List all .gz files in the raw data folder
-  gz_files <- list.files(raw_path, pattern = "\\.gz$", full.names = TRUE)
-  
-  if (length(gz_files) == 0) {
-    cat("No .gz files found in", raw_path, "\n")
-    return(NULL)
-  }
-  
-  # Iterate over the files and gunzip them to the data folder
-  lapply(gz_files, function(file) {
-    # Determine the destination file path
-    dest_file <- file.path(data_path, gsub("\\.gz$", "", basename(file)))
-    cat("Unzipping:", file, "to", dest_file, "\n")
-    # Decompress the file without removing the original
-    R.utils::gunzip(file, destname = dest_file, overwrite = TRUE, remove = FALSE)
-  })
-}
+source(here::here("scripts", "install.R"))
 
 gunzip_files(raw_path, data_path)
 ```

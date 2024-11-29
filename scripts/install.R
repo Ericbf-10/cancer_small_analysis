@@ -1,24 +1,10 @@
-## Install the required packages for the whole pipeline
-
-# Check and install packages if not already installed
-install_if_missing <- function(package) {
-  if (!requireNamespace(package, quietly = TRUE)) {
-    install.packages(package)
-  }
-}
+### Install the required packages for the whole pipeline ###
 
 # List of packages to check and install
-packages <- c("here", "R.utils", "dplyr", "plyr", "dplyr", "ggplot2", "broman", "circlize", "reshape2", "gplots", "Rtsne", "png", "data.table")
+packages <- c("here", "R.utils", "dplyr", "plyr", "dplyr", "ggplot2", "broman", "circlize", "reshape2", "gplots", "Rtsne", "png", "data.table", "matrixStats", "Seurat")
 
 # Iterate over the list and install missing packages
 lapply(packages, install_if_missing)
-
-# Specific check for BiocManager and Bioconductor packages
-install_if_missing_biocmanager <- function(package) {
-  if (!requireNamespace(package, quietly = TRUE)) {
-    BiocManager::install(package)
-  }
-}
 
 if (!requireNamespace("BiocManager", quietly = TRUE)) {
   install.packages("BiocManager")
